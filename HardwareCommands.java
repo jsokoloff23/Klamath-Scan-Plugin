@@ -13,14 +13,8 @@ import org.micromanager.internal.MMStudio;
 public class DeviceSetup {
     private final MMStudio mm_;
     private final CMMCore core_;
-    public final String camName;
     public final String plcName;
-    private final String triggerSource;
-    private final String triggerPolarity;
-    private final String trigger;
-    private final String triggerSourceProp;
-    private final String triggerPolartiyProp;
-    private final String triggerProp;
+    public final String camName;
     private final String propPosition;
     private final String propCellType;
     private final String propCellConfig;
@@ -40,6 +34,14 @@ public class DeviceSetup {
     private final int addrAND;
     private final int addrDelay2;
     private final int addrOneShot;
+    private final String scanTriggerSourceProp;
+    private final String scanTriggerPolartiyProp;
+    private final String defaultTriggerSourceProp;
+    private final String defaultTriggerPolarityProp;
+    private final String triggerSource;
+    private final String triggerPolarity;
+    private final String trigger;
+    private final String triggerProp;
     
     public DeviceSetup(MMStudio studio) {
         mm_ = (MMStudio) studio;
@@ -70,9 +72,11 @@ public class DeviceSetup {
         triggerSource = "TRIGGER SOURCE";
         triggerPolarity = "TriggerPolarity";
         trigger = "Trigger";
-        triggerSourceProp = "EXTERNAL";
-        triggerPolartiyProp = "POSITIVE";
         triggerProp = "NORMAL";
+        scanTriggerSourceProp = "EXTERNAL";
+        scanTriggerPolartiyProp = "POSITIVE";
+        defaultTriggerSourceProp = "INTERNAL";
+        defaultTriggerPolarityProp = "NEGATIVE";
     }
     
     private void setProperty(String device, String prop, String value) throws Exception {
@@ -84,9 +88,9 @@ public class DeviceSetup {
     private void setProperty(String device, String prop, double value) throws Exception {
         core_.setProperty(device, prop, value);
     }
-    public void setPLCProperties(int exp, int stepSize) throws Exception {
+    public void setPLCProperties(int exp, int stepSize, double scanSpeed) throws Exception {
         int exposure = exp * 4;
-        int frameInterval = stepSize * 33 * 4;
+        int frameInterval = (int) (1 / scanSpeed) * 4;
         setProperty(plcName, propPosition, addrDelay1);
         setProperty(plcName, propCellType, valDelay);
         setProperty(plcName, propCellConfig, 0);
@@ -123,10 +127,17 @@ public class DeviceSetup {
         setProperty(plcName, propCellInput1, 0);
         setProperty(plcName, propCellInput2, 0);
     }
-    public void setCameraProperties() throws Exception {
+    
+    public void setScanCameraProperties() throws Exception {
         setProperty(camName, trigger, triggerProp);
-        setProperty(camName, triggerPolarity, triggerPolartiyProp);
-        setProperty(camName, triggerSource, triggerSourceProp);
+        setProperty(camName, triggerPolarity, scanTriggerPolartiyProp);
+        setProperty(camName, triggerSource, scanTriggerSourceProp);
+    }
+    
+    public void setDefaultCameraProperties() throws Exception {
+        setProperty(camName, trigger, triggerProp);
+        setProperty(camName, triggerPolarity, defaultTriggerPolarityProp);
+        setProperty(camName, triggerSource, defaultTriggerSourceProp);
     }
 }
 
