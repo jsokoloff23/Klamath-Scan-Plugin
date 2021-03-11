@@ -14,35 +14,49 @@ import java.text.DecimalFormat;
  *
  * @author Jonah Sokoloff
  */
-    public class StagePositions {
+    public class ScanSettings {
    
     private static MMStudio mm_;
     private static CMMCore core_;
-    private final StageCommands stageCommands;
+    private final HardwareCommands hardwareCommands;
     private final PositionList regionList;
-    private final ArrayList<Double> xPositionList;
-    private final ArrayList<Double> yPositionList;
-    private final ArrayList<Double> zPositionList;
-    private final ArrayList<Double> scanStartPositions;
-    private final ArrayList<Double> scanEndPositions;
+    private final ArrayList<Double> xPositionArray;
+    private final ArrayList<Double> yPositionArray;
+    private final ArrayList<Double> zPositionArray;
+    private final ArrayList<Double> scanStartPositionArray;
+    private final ArrayList<Double> scanEndPositionArray;
+    private final ArrayList<Boolean> brightFieldArray;
+    private final ArrayList<String> channelArray;
+    public static String channelGroupName;
     private static MultiStagePosition region;
     private static DecimalFormat dc;
+    public static Integer stepSize;
     private static String zStage;
     private static String xyStage;
+    public static Boolean timePointsBoolean;
+    public static Integer numTimePoints;
+    public static Integer timePointsInterval;
     
     
-    public StagePositions(MMStudio studio) {
+    public ScanSettings(MMStudio studio) {
         mm_ = (MMStudio) studio;
         core_ = mm_.core();
-        stageCommands = new StageCommands(mm_);
+        hardwareCommands = new HardwareCommands(mm_);
         regionList = new PositionList();
-        xPositionList = new ArrayList<>();
-        yPositionList = new ArrayList<>();
-        zPositionList = new ArrayList<>();
-        scanStartPositions = new ArrayList<>();
-        scanEndPositions = new ArrayList<>();
+        xPositionArray = new ArrayList<>();
+        yPositionArray = new ArrayList<>();
+        zPositionArray = new ArrayList<>();
+        scanStartPositionArray = new ArrayList<>();
+        scanEndPositionArray = new ArrayList<>();
         zStage =  "ZStage:Z:32";
         xyStage = "XYStage:XY:31";
+        brightFieldArray = new ArrayList<>();
+        channelArray = new ArrayList<>();
+        channelGroupName = "Channel";
+        timePointsBoolean = false;
+        timePointsInterval = 0;
+        stepSize = 1;
+        numTimePoints = 1;
     }
     
     //gets current X, Y, and Z stage positions and adds it to positionList
@@ -57,23 +71,23 @@ import java.text.DecimalFormat;
             regionList.replacePosition(regionNum, region);
         }
         
-        if (xPositionList.size() == regionNum) {
-            xPositionList.add(xPos);
+        if (xPositionArray.size() == regionNum) {
+            xPositionArray.add(xPos);
         }
-        if (xPositionList.size() > regionNum) {
-            xPositionList.set(regionNum, xPos);
+        if (xPositionArray.size() > regionNum) {
+            xPositionArray.set(regionNum, xPos);
         }
-        if (yPositionList.size() == regionNum) {
-            yPositionList.add(yPos);
+        if (yPositionArray.size() == regionNum) {
+            yPositionArray.add(yPos);
         }
-        if (yPositionList.size() > regionNum) {
-            yPositionList.set(regionNum, yPos);
+        if (yPositionArray.size() > regionNum) {
+            yPositionArray.set(regionNum, yPos);
         }
-        if (zPositionList.size() == regionNum) {
-            zPositionList.add(zPos);
+        if (zPositionArray.size() == regionNum) {
+            zPositionArray.add(zPos);
         }
-        if (zPositionList.size() > regionNum) {
-            zPositionList.set(regionNum, zPos);
+        if (zPositionArray.size() > regionNum) {
+            zPositionArray.set(regionNum, zPos);
         }
     }
     
@@ -87,50 +101,50 @@ import java.text.DecimalFormat;
     }
     
     public void setXPosition(int regionNum, double xPos) {
-        if (xPositionList.size() == regionNum) {
-            xPositionList.add(xPos);
+        if (xPositionArray.size() == regionNum) {
+            xPositionArray.add(xPos);
         }
         else {
-            xPositionList.set(regionNum, xPos);
+            xPositionArray.set(regionNum, xPos);
         }
     }
     
     public void setYPosition(int regionNum, double yPos) {
-        if (yPositionList.size() == regionNum) {
-            yPositionList.add(yPos);
+        if (yPositionArray.size() == regionNum) {
+            yPositionArray.add(yPos);
         }
         else {
-            yPositionList.set(regionNum, yPos);
+            yPositionArray.set(regionNum, yPos);
         }
     }
     
     public void setZPosition(int regionNum, double zPos) {
-        if (zPositionList.size() == regionNum) {
-            zPositionList.add(zPos);
+        if (zPositionArray.size() == regionNum) {
+            zPositionArray.add(zPos);
         }
         else {
-            zPositionList.set(regionNum, zPos);
+            zPositionArray.set(regionNum, zPos);
         }
     }
     
     //gets current Z stage position, rounds to nearest hundredth micron, adds to start positions array
     //if value at index already exists, it replaces it
     public void setScanStartPosition(double startZ, int regionNum) {
-        if (scanStartPositions.size() == regionNum) {
-            scanStartPositions.add(startZ);
+        if (scanStartPositionArray.size() == regionNum) {
+            scanStartPositionArray.add(startZ);
         }
         else {
-            scanStartPositions.set(regionNum, startZ);
+            scanStartPositionArray.set(regionNum, startZ);
         }
     }
     
     //same as setZStartPositions except adds to end positions array
     public void setScanEndPosition(double endZ, int regionNum) {
-        if (scanEndPositions.size() == regionNum) {
-            scanEndPositions.add(endZ);
+        if (scanEndPositionArray.size() == regionNum) {
+            scanEndPositionArray.add(endZ);
         }
         else {
-            scanEndPositions.set(regionNum, endZ);
+            scanEndPositionArray.set(regionNum, endZ);
         }
     }
     
@@ -139,31 +153,31 @@ import java.text.DecimalFormat;
         return regionList;
     }
     
-    public ArrayList<Double> getXPositionList() {
-        return xPositionList;
+    public ArrayList<Double> getXPositionArray() {
+        return xPositionArray;
     }
     
-    public ArrayList<Double> getYPositionList() {
-        return yPositionList;
+    public ArrayList<Double> getYPositionArray() {
+        return yPositionArray;
     }
     
-    public ArrayList<Double> getZPositionList() {
-        return zPositionList;
+    public ArrayList<Double> getZPositionArray() {
+        return zPositionArray;
     }
     
     //returns indexed z start position
-    public ArrayList<Double> getScanStartPositionList() {
-        return scanStartPositions;
+    public ArrayList<Double> getScanStartPositionArray() {
+        return scanStartPositionArray;
     }
     
     //returns indexed z end position
-    public ArrayList<Double> getScanEndPositionList() {
-        return scanEndPositions;
+    public ArrayList<Double> getScanEndPositionArray() {
+        return scanEndPositionArray;
     }
     public void positionArrayToRegion(int regionNum) {
-        double xPos = xPositionList.get(regionNum);
-        double yPos = yPositionList.get(regionNum);
-        double zPos = zPositionList.get(regionNum);
+        double xPos = xPositionArray.get(regionNum);
+        double yPos = yPositionArray.get(regionNum);
+        double zPos = zPositionArray.get(regionNum);
         
         MultiStagePosition region = new MultiStagePosition(xyStage, xPos, yPos, zStage, zPos);
         if (regionList.getNumberOfPositions() == regionNum) {
@@ -173,6 +187,37 @@ import java.text.DecimalFormat;
             regionList.replacePosition(regionNum, region);
         }
     }
+    
+    public void initializeBrightFieldArray() {
+        if (brightFieldArray.size() < regionList.getNumberOfPositions()) {
+            for (int regions = 0; regions < regionList.getNumberOfPositions() ; regions++) {
+                brightFieldArray.add(false);
+            }
+        }
+    }
+    
+    public void setBrightFieldArrayElement(boolean bf, int regionNum) {
+        if (brightFieldArray.size() < regionNum + 1) {
+                brightFieldArray.add(bf);
+            }
+            else {
+                brightFieldArray.set(regionNum, bf);
+            }
+    }
+    
+    public ArrayList<Boolean> getBrightFieldArray() {
+        return brightFieldArray;
+    }
+    
+    public void addChannel(String channel) {
+        channelArray.add(channel);
+    }
+    
+    public ArrayList<String> getChannelArray() {
+        return channelArray;
+    }
+    
+    
 }
     
 

@@ -22,64 +22,56 @@ import org.micromanager.internal.MMStudio;
 public class Acquisition {
     private final MMStudio mm_;
     private CMMCore core_;
-    private final int stepSize;
-    private final StagePositions stagePositions;
-    public int exposureMS;
-    public final ArrayList<Boolean> brightFieldArray;
-    public final String dir;
-    private final DeviceSetup deviceSetup;
-    private final StageCommands stageCommands;
-    private Datastore data;
+    private final HardwareCommands hardwareCommands;
+    private final Integer stepSize;
+    private final PositionList stagePositions;
     private final ArrayList<String> channelArray;
+    private final ArrayList<Double> zStartPositions;
+    private final ArrayList<Double> zEndPositions;
+    private final ArrayList<Boolean> brightFieldArray;
+    private final String dir;
     private final String groupName;
     private final Boolean timeSeries;
-    private final Integer delay;
-    private final double stageScanSpeed;
-    private final double stageMoveSpeed;
+    private final int delay;
     private final Integer timePointsNum;
     private final String brightFieldPreset;
+    private Datastore data;
+
     
-    public Acquisition(int step, String group, ArrayList brightFieldImage, Boolean timePoints, Integer numTimePoints, Integer interval, 
-           String directory, ArrayList channels, StagePositions positions, MMStudio studio) {
+    public Acquisition(ScanSettings acquisitionSettings, String directory, MMStudio studio) {
         
         mm_ = (MMStudio) studio;
         core_ = mm_.core();
-        deviceSetup = new DeviceSetup (mm_);
-        stageCommands = new StageCommands(mm_);
-        stepSize = step;
-        groupName = group;
-        brightFieldArray = brightFieldImage;
-        brightFieldPreset = "BF";
-        timeSeries = timePoints;
-        delay = 1000 * interval;
-        timePointsNum = numTimePoints;
+        
+        hardwareCommands = new HardwareCommands (mm_);
+        stepSize = acquisitionSettings.stepSize;
+        stagePositions = acquisitionSettings.getPositionList();
+        zStartPositions = acquisitionSettings.getScanStartPositionArray();
+        zEndPositions = acquisitionSettings.getScanEndPositionArray();
+        brightFieldArray = acquisitionSettings.getBrightFieldArray();
+        channelArray = acquisitionSettings.getChannelArray();
         dir = directory;
-        channelArray = channels;
-        stagePositions = positions;
-        exposureMS = 10;
-        stageScanSpeed = 0.03;
-        stageMoveSpeed = 1.0;
+        groupName = acquisitionSettings.channelGroupName;
+        timeSeries = acquisitionSettings.timePointsBoolean;
+        delay = 1000 * acquisitionSettings.timePointsInterval;
+        timePointsNum = acquisitionSettings.numTimePoints;
+        brightFieldPreset = "BF";
+        
+
     }
     
     public void startAcquisition() throws Exception {
-        
-        stageCommands.scanSpeed = stageScanSpeed;
-        stageCommands.moveSpeed = stageMoveSpeed;
-        deviceSetup.setPLCProperties(exposureMS, stepSize, stageScanSpeed);
-        
-        PositionList positionList = stagePositions.getPositionList();
-        ArrayList<Double> zStartPositions = stagePositions.getScanStartPositionList();
-        ArrayList<Double> zEndPositions = stagePositions.getScanEndPositionList();
-        
+        hardwareCommands.setPLCProperties(stepSize);
+       
         for (int numTimePoints = 0; numTimePoints < timePointsNum; numTimePoints ++) {
             long start = System.nanoTime();
             
-            for (int regionNum = 0; regionNum < positionList.getNumberOfPositions(); regionNum++) {
-                MultiStagePosition region = positionList.getPosition(regionNum);
+            for (int regionNum = 0; regionNum < stagePositions.getNumberOfPositions(); regionNum++) {
+                MultiStagePosition region = stagePositions.getPosition(regionNum);
                 
                 if (brightFieldArray.get(regionNum)) {
-                    stageCommands.moveStage(region);
-                    deviceSetup.setDefaultCameraProperties();
+                    hardwareCommands.moveStage(region);
+                    hardwareCommands.setDefaultCameraProperties();
                     core_.setConfig(groupName, brightFieldPreset);
                     
                     data = mm_.data().createRAMDatastore();
@@ -96,16 +88,16 @@ public class Acquisition {
                 double zEnd = zEndPositions.get(regionNum);
                 int numFrames = (int) Math.round(Math.abs(zEnd - zStart));
                     
-                stageCommands.moveStage(region.getX(), region.getY(), zStart);
+                hardwareCommands.moveStage(region.getX(), region.getY(), zStart);
                 
                 for (int channelNum = 0; channelNum < channelArray.size(); channelNum++) {
                     data = mm_.data().createRAMDatastore();
-                    stageCommands.scanSetup(zStart, zEnd);
-                    deviceSetup.setScanCameraProperties();
+                    hardwareCommands.scanSetup(zStart, zEnd);
+                    hardwareCommands.setScanCameraProperties();
                     core_.setConfig(groupName, channelArray.get(channelNum));
                     core_.startContinuousSequenceAcquisition(0);
                     while (core_.isSequenceRunning()) {
-                        stageCommands.scanStart();
+                        hardwareCommands.scanStart();
                         for (int curFrame = 0; curFrame < numFrames;) {
                             if (core_.getRemainingImageCount() > 0) {
                                 TaggedImage tagged = core_.popNextTaggedImage();
@@ -145,6 +137,6 @@ public class Acquisition {
                 }
             }
         }
-        deviceSetup.setDefaultCameraProperties();
+        hardwareCommands.setDefaultCameraProperties();
     }
 }

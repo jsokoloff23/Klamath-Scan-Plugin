@@ -36,10 +36,10 @@ public class ContinuousScan implements MenuPlugin, SciJavaPlugin {
     //action performed when plugin is selected in plugin menu
     @Override
     public void onPluginSelected() {
-        if (frame == null) {
+        if (frame == null)  {
             try {
                 frame = new ContScanFrame(mm_);
-            }   
+            }
             catch (Exception e) {
                     return;
             }
@@ -62,7 +62,7 @@ public class ContinuousScan implements MenuPlugin, SciJavaPlugin {
 
     @Override
     public String getHelpText() {
-        return "Takes continuous stage scan of multiple regions. Select first region and then select start and end z for each region.";
+        return "Takes continuous stage scan of multiple regions. Select regions and then select start and end z for each region.";
     }
 
     @Override

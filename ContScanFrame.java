@@ -8,8 +8,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
 import javax.swing.JFileChooser;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import mmcorej.CMMCore;
 import org.micromanager.MultiStagePosition;
 import org.micromanager.internal.MMStudio;
@@ -27,36 +25,27 @@ import org.micromanager.internal.MMStudio;
 public class ContScanFrame extends javax.swing.JFrame {
     private static MMStudio mm_;
     private final CMMCore core_;
-    private StagePositions stagePositions;
-    private final StageCommands stageCommands;
+    private ScanSettings acquisitionSettings;
+    private final HardwareCommands hardwareCommands;
     private int regionNum;
-    private ArrayList<Boolean> brightFieldArray;
-    private ArrayList<String> channelList;
     private String directory;
-    private Boolean timePoints;
-    private int interval;
     private MultiStagePosition region;
     private double zStart;
     private double zEnd;
-    private int numTimePoints;
-    private int stepSize;
     private double xPos;
     private Double yPos;
     private Double zPos;
+    private Acquisition acquisition;
     /**
      * Creates new form ContScanFrame
      */
     public ContScanFrame(MMStudio studio) {
         mm_ = (MMStudio) studio;
         core_ = mm_.core();
-        stageCommands = new StageCommands(mm_);
-        stagePositions = new StagePositions(mm_);
+        hardwareCommands = new HardwareCommands(mm_);
+        acquisitionSettings = new ScanSettings(mm_);
         regionNum = 0;
-        brightFieldArray = new ArrayList();
         directory = "";
-        numTimePoints = 1;
-        interval = 0;
-        stepSize = 1;
         initComponents();
     }
 
@@ -187,7 +176,7 @@ public class ContScanFrame extends javax.swing.JFrame {
         regionLabel.setText("Region" + (regionNum + 1));
 
         goToButton.setText("Go To");
-        if (stagePositions.getPositionList().getPosition(regionNum) == null) {
+        if (acquisitionSettings.getPositionList().getPosition(regionNum) == null) {
             goToButton.setEnabled(false);
         }
         goToButton.addActionListener(new java.awt.event.ActionListener() {
@@ -238,7 +227,7 @@ public class ContScanFrame extends javax.swing.JFrame {
         });
 
         toAcquisitionButton.setText("Finish");
-        if (stagePositions.getPositionList().getNumberOfPositions() == 0) {
+        if (acquisitionSettings.getPositionList().getNumberOfPositions() == 0) {
             toAcquisitionButton.setEnabled(false);
         }
         toAcquisitionButton.addActionListener(new java.awt.event.ActionListener() {
@@ -414,7 +403,7 @@ public class ContScanFrame extends javax.swing.JFrame {
         });
 
         nextButton.setText("Next Region");
-        if (stagePositions.getScanStartPositionList().size() <= regionNum) {
+        if (acquisitionSettings.getScanStartPositionArray().size() <= regionNum) {
             nextButton.setEnabled(false);
         }
         nextButton.addActionListener(new java.awt.event.ActionListener() {
@@ -434,7 +423,12 @@ public class ContScanFrame extends javax.swing.JFrame {
         jLabel1.setText("Step Size:");
 
         stepSizeBox.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
-        stepSizeBox.setText("1");
+        stepSizeBox.setText(String.valueOf(acquisitionSettings.stepSize));
+        stepSizeBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                stepSizeBoxActionPerformed(evt);
+            }
+        });
         stepSizeBox.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyReleased(java.awt.event.KeyEvent evt) {
                 stepSizeBoxKeyReleased(evt);
@@ -563,11 +557,11 @@ public class ContScanFrame extends javax.swing.JFrame {
                             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, acquisitionPanelLayout.createSequentialGroup()
                                 .addGap(24, 24, 24)
                                 .addGroup(acquisitionPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(zSetupLabel)
                                     .addGroup(acquisitionPanelLayout.createSequentialGroup()
                                         .addGap(10, 10, 10)
-                                        .addComponent(regionLabel1)))
-                                .addGap(120, 120, 120)))
+                                        .addComponent(regionLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 68, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(zSetupLabel))
+                                .addGap(108, 108, 108)))
                         .addGroup(acquisitionPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addGroup(acquisitionPanelLayout.createSequentialGroup()
                                 .addGap(1, 1, 1)
@@ -724,14 +718,12 @@ public class ContScanFrame extends javax.swing.JFrame {
         //REMINDER ADD BACK PIXEL CALIBRATION
         if ((String)setupComboBox.getSelectedItem() == "HTLS"){
             try {
-                stagePositions = new StagePositions(mm_);
             } catch (Exception ex) {
                 Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
         if ((String)setupComboBox.getSelectedItem() == "CLS") {
             try {
-                stagePositions = new StagePositions(mm_);
             } catch (Exception ex) {
                 Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -743,15 +735,22 @@ public class ContScanFrame extends javax.swing.JFrame {
         yField.setText("");
         zField.setText("");
         
+        zStartField.setText("");
+        zEndField.setText("");
+        regionLabel1.setText("Region " + 1);
+        
+        timePointsField.setText("");
+        intervalField.setText("");
+        
         CardLayout card = (CardLayout)mainPanel.getLayout();
         card.show(mainPanel, "regionsPanel");
     }//GEN-LAST:event_beginButtonActionPerformed
 
     private void goToButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_goToButtonActionPerformed
-        MultiStagePosition region = stagePositions.getPositionList().getPosition(regionNum);
+        MultiStagePosition region = acquisitionSettings.getPositionList().getPosition(regionNum);
         if (region != null) {
             try {
-                stageCommands.moveStage(region);
+                hardwareCommands.moveStage(region);
             } catch (Exception ex) {
                 Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -760,11 +759,11 @@ public class ContScanFrame extends javax.swing.JFrame {
 
     private void SetButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_SetButtonActionPerformed
         try {
-            region = stageCommands.getStagePosition();
-            stagePositions.setRegion(regionNum, region);
-            stagePositions.setXPosition(regionNum, region.getX());
-            stagePositions.setYPosition(regionNum, region.getY());
-            stagePositions.setZPosition(regionNum, region.getZ());
+            region = hardwareCommands.getStagePosition();
+            acquisitionSettings.setRegion(regionNum, region);
+            acquisitionSettings.setXPosition(regionNum, region.getX());
+            acquisitionSettings.setYPosition(regionNum, region.getY());
+            acquisitionSettings.setZPosition(regionNum, region.getZ());
         } catch (Exception ex) {
             Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -782,7 +781,7 @@ public class ContScanFrame extends javax.swing.JFrame {
     private void previousRegionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_previousRegionButtonActionPerformed
         regionNum--;
         
-        MultiStagePosition region = stagePositions.getPositionList().getPosition(regionNum);
+        MultiStagePosition region = acquisitionSettings.getPositionList().getPosition(regionNum);
         xField.setText(String.valueOf(region.getX()));
         yField.setText(String.valueOf(region.getY()));
         zField.setText(String.valueOf(region.getZ()));
@@ -797,32 +796,29 @@ public class ContScanFrame extends javax.swing.JFrame {
 
     private void toAcquisitionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_toAcquisitionButtonActionPerformed
         regionNum = 0;
-        if (brightFieldArray.size() < stagePositions.getPositionList().getNumberOfPositions()) {
-            for (int regions = 0; regions < stagePositions.getPositionList().getNumberOfPositions(); regions++) {
-                brightFieldArray.add(false);
-            }
-        }
-        brightFieldCheck.setSelected(brightFieldArray.get(regionNum));
+        
+        acquisitionSettings.initializeBrightFieldArray();
+        brightFieldCheck.setSelected(acquisitionSettings.getBrightFieldArray().get(0));
         
         try {
-            stageCommands.moveStage(stagePositions.getPositionList().getPosition(regionNum));
+            hardwareCommands.moveStage(acquisitionSettings.getPositionList().getPosition(regionNum));
         } catch (Exception ex) {
             Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
         
         regionLabel1.setText("Region " + (regionNum + 1));
         
-        if (stagePositions.getScanStartPositionList().size() > regionNum) {
-            zStartField.setText(String.valueOf(stagePositions.getScanStartPositionList().get(regionNum)));
+        if (acquisitionSettings.getScanStartPositionArray().size() > regionNum) {
+            zStartField.setText(String.valueOf(acquisitionSettings.getScanStartPositionArray().get(regionNum)));
         }
         
-        if (stagePositions.getScanEndPositionList().size() > regionNum) {
-            zEndField.setText(String.valueOf(stagePositions.getScanEndPositionList().get(regionNum)));
+        if (acquisitionSettings.getScanEndPositionArray().size() > regionNum) {
+            zEndField.setText(String.valueOf(acquisitionSettings.getScanEndPositionArray().get(regionNum)));
         }
         
         previousButton.setEnabled(false);
         
-        if (stagePositions.getScanEndPositionList().size() >= 1 & stagePositions.getScanStartPositionList().size() >= 1) {
+        if (acquisitionSettings.getScanEndPositionArray().size() >= 1 & acquisitionSettings.getScanStartPositionArray().size() >= 1) {
             nextButton.setEnabled(true);
         }
         
@@ -833,8 +829,8 @@ public class ContScanFrame extends javax.swing.JFrame {
     private void nextRegionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nextRegionButtonActionPerformed
         regionNum++;
         
-        if (stagePositions.getPositionList().getPosition(regionNum) != null) {
-            MultiStagePosition region = stagePositions.getPositionList().getPosition(regionNum);
+        if (acquisitionSettings.getPositionList().getPosition(regionNum) != null) {
+            MultiStagePosition region = acquisitionSettings.getPositionList().getPosition(regionNum);
             xField.setText(String.valueOf(region.getX()));
             yField.setText(String.valueOf(region.getY()));
             zField.setText(String.valueOf(region.getZ()));
@@ -917,17 +913,17 @@ public class ContScanFrame extends javax.swing.JFrame {
 
     private void zStartSetButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zStartSetButtonActionPerformed
         try {
-            zStart = stageCommands.getZPosition();
-            stagePositions.setScanStartPosition(zStart, regionNum);
+            zStart = hardwareCommands.getZPosition();
+            acquisitionSettings.setScanStartPosition(zStart, regionNum);
         } catch (Exception ex) {
             Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
         
-        zStartField.setText(String.valueOf(stagePositions.getScanStartPositionList().get(regionNum)));
+        zStartField.setText(String.valueOf(acquisitionSettings.getScanStartPositionArray().get(regionNum)));
         
-        if (stagePositions.getScanStartPositionList().size() > regionNum & 
-            stagePositions.getScanEndPositionList().size() > regionNum &
-            stagePositions.getPositionList().getNumberOfPositions() > regionNum + 1) {
+        if (acquisitionSettings.getScanStartPositionArray().size() > regionNum & 
+            acquisitionSettings.getScanEndPositionArray().size() > regionNum &
+            acquisitionSettings.getPositionList().getNumberOfPositions() > regionNum + 1) {
             
             nextButton.setEnabled(true);
         }
@@ -935,17 +931,17 @@ public class ContScanFrame extends javax.swing.JFrame {
 
     private void zEndSetButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zEndSetButtonActionPerformed
         try {
-            zEnd = stageCommands.getZPosition();
-            stagePositions.setScanEndPosition(zEnd, regionNum);
+            zEnd = hardwareCommands.getZPosition();
+            acquisitionSettings.setScanEndPosition(zEnd, regionNum);
         } catch (Exception ex) {
             Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
         
-        zEndField.setText(String.valueOf(stagePositions.getScanEndPositionList().get(regionNum)));
+        zEndField.setText(String.valueOf(acquisitionSettings.getScanEndPositionArray().get(regionNum)));
         
-        if (stagePositions.getScanStartPositionList().size() > regionNum & 
-            stagePositions.getScanEndPositionList().size() > regionNum &
-            stagePositions.getPositionList().getNumberOfPositions() > regionNum + 1) {
+        if (acquisitionSettings.getScanStartPositionArray().size() > regionNum & 
+            acquisitionSettings.getScanEndPositionArray().size() > regionNum &
+            acquisitionSettings.getPositionList().getNumberOfPositions() > regionNum + 1) {
             
             nextButton.setEnabled(true);
         }
@@ -954,10 +950,10 @@ public class ContScanFrame extends javax.swing.JFrame {
     private void nextButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nextButtonActionPerformed
         regionNum++;
 
-        MultiStagePosition region = stagePositions.getPositionList().getPosition(regionNum);
+        MultiStagePosition region = acquisitionSettings.getPositionList().getPosition(regionNum);
         
         try {
-            stageCommands.moveStage(region);
+            hardwareCommands.moveStage(region);
         } catch (Exception ex) {
             Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -966,35 +962,35 @@ public class ContScanFrame extends javax.swing.JFrame {
         previousButton.setEnabled(true);
         
         //Insures that if there isn't a next region to go to, nextButton is disabled
-        if (stagePositions.getPositionList().getNumberOfPositions() == regionNum + 1) {
+        if (acquisitionSettings.getPositionList().getNumberOfPositions() == regionNum + 1) {
             nextButton.setEnabled(false);
         }
         
         //Insures that the zFields are correctly filled when nextButton is pressed
-        if (stagePositions.getScanStartPositionList().size() > regionNum) {
-            zStartField.setText(String.valueOf(stagePositions.getScanStartPositionList().get(regionNum)));
+        if (acquisitionSettings.getScanStartPositionArray().size() > regionNum) {
+            zStartField.setText(String.valueOf(acquisitionSettings.getScanStartPositionArray().get(regionNum)));
         }
-        if (stagePositions.getScanEndPositionList().size() > regionNum) {
-            zEndField.setText(String.valueOf(stagePositions.getScanEndPositionList().get(regionNum)));
+        if (acquisitionSettings.getScanEndPositionArray().size() > regionNum) {
+            zEndField.setText(String.valueOf(acquisitionSettings.getScanEndPositionArray().get(regionNum)));
         }   
-        if (stagePositions.getScanStartPositionList().size() <= regionNum) {
+        if (acquisitionSettings.getScanStartPositionArray().size() <= regionNum) {
             zStartField.setText("");
         }
-        if (stagePositions.getScanEndPositionList().size() <= regionNum) {
+        if (acquisitionSettings.getScanEndPositionArray().size() <= regionNum) {
             zEndField.setText("");
         }
         
-        brightFieldCheck.setSelected(brightFieldArray.get(regionNum));
+        brightFieldCheck.setSelected(acquisitionSettings.getBrightFieldArray().get(regionNum));
         
     }//GEN-LAST:event_nextButtonActionPerformed
 
     private void previousButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_previousButtonActionPerformed
         regionNum--;
 
-        MultiStagePosition region = stagePositions.getPositionList().getPosition(regionNum);
+        MultiStagePosition region = acquisitionSettings.getPositionList().getPosition(regionNum);
         
         try {
-            stageCommands.moveStage(region);
+            hardwareCommands.moveStage(region);
         } catch (Exception ex) {
             Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -1002,14 +998,14 @@ public class ContScanFrame extends javax.swing.JFrame {
         regionLabel1.setText("Region" + (regionNum + 1));
         nextButton.setEnabled(true);
         
-        zStartField.setText(String.valueOf(stagePositions.getScanStartPositionList().get(regionNum)));
-        zEndField.setText(String.valueOf(stagePositions.getScanEndPositionList().get(regionNum)));
+        zStartField.setText(String.valueOf(acquisitionSettings.getScanStartPositionArray().get(regionNum)));
+        zEndField.setText(String.valueOf(acquisitionSettings.getScanEndPositionArray().get(regionNum)));
 
         if (regionNum == 0) {
             previousButton.setEnabled(false);
         }
         
-        brightFieldCheck.setSelected(brightFieldArray.get(regionNum));
+        brightFieldCheck.setSelected(acquisitionSettings.getBrightFieldArray().get(regionNum));
     }//GEN-LAST:event_previousButtonActionPerformed
 
     private void browseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_browseButtonActionPerformed
@@ -1023,21 +1019,24 @@ public class ContScanFrame extends javax.swing.JFrame {
 
     private void startAcquisitionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_startAcquisitionButtonActionPerformed
         DefaultListModel usedModel = (DefaultListModel) usedChannelJList.getModel();
-        String groupName = (String) channelComboBox.getSelectedItem();
-        ArrayList<String> channelList = new ArrayList();
+        acquisitionSettings.channelGroupName = (String) channelComboBox.getSelectedItem();
         
         for (int i=0; i < usedModel.getSize(); i++) {
-            channelList.add((String) usedModel.getElementAt(i));
+            String channel = (String) usedModel.getElementAt(i);
+            acquisitionSettings.addChannel(channel);
         }
         
-        this.setVisible(false);
-        CardLayout card = (CardLayout)mainPanel.getLayout();
-        card.show(mainPanel, "startPanel");
-        regionNum = 0;
-        this.dispose();
+        //this.setVisible(false);
+        //CardLayout card = (CardLayout)mainPanel.getLayout();
+        //card.show(mainPanel, "startPanel");
+        //regionNum = 0;
+        //this.dispose();
         
-        Acquisition acquisition = new Acquisition(stepSize, groupName, brightFieldArray, false, numTimePoints, interval, directory, channelList, stagePositions, mm_);
+        System.out.println("DOG1");
+        acquisition = new Acquisition(acquisitionSettings, directory, mm_);
+        System.out.println("DOG2");
         try {
+            System.out.println("DOG3");
             acquisition.startAcquisition();
         } catch (Exception ex) {
             Logger.getLogger(ContScanFrame.class.getName()).log(Level.SEVERE, null, ex);
@@ -1050,9 +1049,9 @@ public class ContScanFrame extends javax.swing.JFrame {
         
         regionLabel.setText("Region " + (regionNum + 1));
         
-        xField.setText(String.valueOf(stagePositions.getPositionList().getPosition(regionNum).getX()));
-        yField.setText(String.valueOf(stagePositions.getPositionList().getPosition(regionNum).getY()));
-        zField.setText(String.valueOf(stagePositions.getPositionList().getPosition(regionNum).getZ()));
+        xField.setText(String.valueOf(acquisitionSettings.getPositionList().getPosition(regionNum).getX()));
+        yField.setText(String.valueOf(acquisitionSettings.getPositionList().getPosition(regionNum).getY()));
+        zField.setText(String.valueOf(acquisitionSettings.getPositionList().getPosition(regionNum).getZ()));
         
         if (regionNum == 0) {
             previousRegionButton.setEnabled(false);
@@ -1066,48 +1065,39 @@ public class ContScanFrame extends javax.swing.JFrame {
 
     private void brightFieldCheckActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_brightFieldCheckActionPerformed
         if (brightFieldCheck.isSelected()) {
-            if (brightFieldArray.size() < regionNum + 1) {
-                brightFieldArray.add(true);
-            }
-            else {
-                brightFieldArray.set(regionNum, true);
-            }
+            acquisitionSettings.setBrightFieldArrayElement(true, regionNum);
         }
         else {
-            brightFieldArray.set(regionNum, false);
-        }
+            acquisitionSettings.setBrightFieldArrayElement(false, regionNum);
+        };
             
     }//GEN-LAST:event_brightFieldCheckActionPerformed
 
     private void timePointsCheckActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_timePointsCheckActionPerformed
         if (timePointsCheck.isSelected()) {
-            timePoints = true;
+            acquisitionSettings.timePointsBoolean = true;
             intervalField.setEnabled(true);
             timePointsField.setEnabled(true);
         }
         else {
-            timePoints = false;
+            acquisitionSettings.timePointsBoolean = false;
             intervalField.setEnabled(false);
             timePointsField.setEnabled(false);
         }
     }//GEN-LAST:event_timePointsCheckActionPerformed
 
     private void xFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_xFieldKeyReleased
-        try {
-            xPos = Double.valueOf(xField.getText());
-        }
-        catch(NumberFormatException ex) { 
-        }
+        xPos = Double.valueOf(xField.getText());
         
-        stagePositions.setXPosition(regionNum, xPos);
+        acquisitionSettings.setXPosition(regionNum, xPos);
         
-        if (stagePositions.getXPositionList().size() > regionNum &
-            stagePositions.getYPositionList().size() > regionNum &
-            stagePositions.getZPositionList().size() > regionNum ) {
+        if (acquisitionSettings.getXPositionArray().size() > regionNum &
+            acquisitionSettings.getYPositionArray().size() > regionNum &
+            acquisitionSettings.getZPositionArray().size() > regionNum ) {
             
-            double yPos = stagePositions.getYPositionList().get(regionNum);
-            double zPos = stagePositions.getZPositionList().get(regionNum);
-            stagePositions.setRegion(regionNum, xPos, yPos, zPos);
+            double yPos = acquisitionSettings.getYPositionArray().get(regionNum);
+            double zPos = acquisitionSettings.getZPositionArray().get(regionNum);
+            acquisitionSettings.setRegion(regionNum, xPos, yPos, zPos);
             goToButton.setEnabled(true);
             nextRegionButton.setEnabled(true);
             toAcquisitionButton.setEnabled(true);
@@ -1115,21 +1105,17 @@ public class ContScanFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_xFieldKeyReleased
 
     private void yFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_yFieldKeyReleased
-        try {
-            yPos = Double.valueOf(yField.getText());
-        }
-        catch(NumberFormatException ex) { 
-        }
+        yPos = Double.valueOf(yField.getText());
         
-        stagePositions.setYPosition(regionNum, yPos);
+        acquisitionSettings.setYPosition(regionNum, yPos);
         
-        if (stagePositions.getXPositionList().size() > regionNum &
-            stagePositions.getYPositionList().size() > regionNum &
-            stagePositions.getZPositionList().size() > regionNum ) {
+        if (acquisitionSettings.getXPositionArray().size() > regionNum &
+            acquisitionSettings.getYPositionArray().size() > regionNum &
+            acquisitionSettings.getZPositionArray().size() > regionNum ) {
             
-            double xPos = stagePositions.getXPositionList().get(regionNum);
-            double zPos = stagePositions.getZPositionList().get(regionNum);
-            stagePositions.setRegion(regionNum, xPos, yPos, zPos);
+            double xPos = acquisitionSettings.getXPositionArray().get(regionNum);
+            double zPos = acquisitionSettings.getZPositionArray().get(regionNum);
+            acquisitionSettings.setRegion(regionNum, xPos, yPos, zPos);
             goToButton.setEnabled(true);
             nextRegionButton.setEnabled(true);
             toAcquisitionButton.setEnabled(true);
@@ -1137,21 +1123,17 @@ public class ContScanFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_yFieldKeyReleased
 
     private void zFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_zFieldKeyReleased
-        try {
-            zPos = Double.valueOf(zField.getText());
-        }
-        catch(NumberFormatException ex) { 
-        }
+        zPos = Double.valueOf(zField.getText());
         
-        stagePositions.setZPosition(regionNum, zPos);
+        acquisitionSettings.setZPosition(regionNum, zPos);
         
-        if (stagePositions.getXPositionList().size() > regionNum &
-            stagePositions.getYPositionList().size() > regionNum &
-            stagePositions.getZPositionList().size() > regionNum ) {
+        if (acquisitionSettings.getXPositionArray().size() > regionNum &
+            acquisitionSettings.getYPositionArray().size() > regionNum &
+            acquisitionSettings.getZPositionArray().size() > regionNum ) {
             
-            double xPos = stagePositions.getXPositionList().get(regionNum);
-            double yPos = stagePositions.getYPositionList().get(regionNum);
-            stagePositions.setRegion(regionNum, xPos, yPos, zPos);
+            double xPos = acquisitionSettings.getXPositionArray().get(regionNum);
+            double yPos = acquisitionSettings.getYPositionArray().get(regionNum);
+            acquisitionSettings.setRegion(regionNum, xPos, yPos, zPos);
             goToButton.setEnabled(true);
             nextRegionButton.setEnabled(true);
             toAcquisitionButton.setEnabled(true);
@@ -1159,66 +1141,49 @@ public class ContScanFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_zFieldKeyReleased
 
     private void zStartFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_zStartFieldKeyReleased
-        try {
-            zStart = Double.valueOf(zStartField.getText());
-        }
-        catch(NumberFormatException ex) { 
-        }
-        
-        stagePositions.setScanStartPosition(zStart, regionNum);
+        zStart = Double.valueOf(zStartField.getText());
+
+        acquisitionSettings.setScanStartPosition(zStart, regionNum);
 
         
-        if (stagePositions.getScanStartPositionList().size() > regionNum & 
-            stagePositions.getScanEndPositionList().size() > regionNum &
-            stagePositions.getPositionList().getNumberOfPositions() > regionNum + 1) {
+        if (acquisitionSettings.getScanStartPositionArray().size() > regionNum & 
+            acquisitionSettings.getScanEndPositionArray().size() > regionNum &
+            acquisitionSettings.getPositionList().getNumberOfPositions() > regionNum + 1) {
             
             nextButton.setEnabled(true);
         }
     }//GEN-LAST:event_zStartFieldKeyReleased
 
     private void zEndFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_zEndFieldKeyReleased
-        try {
-            zEnd = Double.valueOf(zEndField.getText());
-        }
-        catch(NumberFormatException ex) { 
-        }
+        zEnd = Double.valueOf(zEndField.getText());
         
-        stagePositions.setScanEndPosition(zEnd, regionNum);
+        acquisitionSettings.setScanEndPosition(zEnd, regionNum);
 
         
-        if (stagePositions.getScanStartPositionList().size() > regionNum & 
-            stagePositions.getScanEndPositionList().size() > regionNum &
-            stagePositions.getPositionList().getNumberOfPositions() > regionNum + 1) {
+        if (acquisitionSettings.getScanStartPositionArray().size() > regionNum & 
+            acquisitionSettings.getScanEndPositionArray().size() > regionNum &
+            acquisitionSettings.getPositionList().getNumberOfPositions() > regionNum + 1) {
             
             nextButton.setEnabled(true);
         }
     }//GEN-LAST:event_zEndFieldKeyReleased
 
     private void timePointsFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_timePointsFieldKeyReleased
-        try {
-            numTimePoints = (int) Math.round(Double.valueOf(timePointsField.getText()));
-        }
-        catch(NumberFormatException ex) { 
-        }
+        acquisitionSettings.numTimePoints = (int) Math.round(Double.valueOf(timePointsField.getText()));
     }//GEN-LAST:event_timePointsFieldKeyReleased
 
     private void intervalFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_intervalFieldKeyReleased
-        try {
-            interval = (int) Math.round(Double.valueOf(intervalField.getText()));
-        }
-        catch(NumberFormatException ex) { 
-        }
+        acquisitionSettings.timePointsInterval = (int) Math.round(Double.valueOf(intervalField.getText()));
     }//GEN-LAST:event_intervalFieldKeyReleased
 
     private void stepSizeBoxKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_stepSizeBoxKeyReleased
-        try {
-            stepSize = (int) Math.round(Double.valueOf(stepSizeBox.getText()));
-        }
-        catch(NumberFormatException ex) { 
-        }
+        acquisitionSettings.stepSize = (int) Math.round(Double.valueOf(stepSizeBox.getText()));
     }//GEN-LAST:event_stepSizeBoxKeyReleased
 
-            
+    private void stepSizeBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stepSizeBoxActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_stepSizeBoxActionPerformed
+
     /**
      * @param args the command line arguments
      */
