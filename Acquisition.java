@@ -6,6 +6,9 @@
 package org.micromanager.ScanPlugin;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,15 +42,16 @@ public class Acquisition implements Runnable{
     private Thread Thread;
     
     public String fileExistsCheck(String directory) {
-        int i = 0;
+        int i = 1;
         String dir = directory;
-        File file = new File(directory);
+        Path path = Paths.get(directory);
         while (true) {
-            if (file.exists()) {
-                i++;
+            if (Files.exists(path)) {
                 dir = directory + "_" + i;
-                file = new File(dir);
-            } else {
+                path = Paths.get(dir);
+                i++;
+            }
+            else {
                 break;
             }
         }
@@ -67,7 +71,7 @@ public class Acquisition implements Runnable{
         hardwareCommands = new HardwareCommands(mm_);
         regionSettingsArray = settings.getRegionSettingsArray();
         channelOrderArray = settings.getChannelOrderArray();
-        directory = fileExistsCheck(settings.getDirectory());
+        directory = settings.getDirectory();
         abortBoolean = false;
     }  
     @Override
@@ -148,40 +152,55 @@ public class Acquisition implements Runnable{
                                     
                                     int numImages = (int) Math.round(1/(regionSettings.getVideoExposureTime()/1000) * regionSettings.getVideoDurationInSeconds());
                                     int frameNumber = 0;
+                                    int timeout = 0;
                                     boolean sequenceBoolean = false;
-                                    core_.startSequenceAcquisition(numImages, 0, true);
-                                    while (core_.getRemainingImageCount() > 0 || core_.isSequenceRunning()) {
-                                        if (core_.getRemainingImageCount() > 0) {
-                                            TaggedImage tagged = core_.popNextTaggedImage();
-                                            Image image = mm_.data().convertTaggedImage(tagged);
-                                            Metadata meta = image.getMetadata().copy().xPositionUm(xPos).yPositionUm(yPos).zPositionUm(zPos).build();
-                                            Coords coords = image.getCoords().copyBuilder().t(frameNumber).build();
-                                            image = image.copyWith(coords, meta);
-                                            data.putImage(image);
-                                            if (core_.isSequenceRunning() & !sequenceBoolean) {
-                                                view.getAcquisitionLabel().setText("Saving " + channel + " video");
-                                                sequenceBoolean = true;
-                                            }
-                                            frameNumber++;
-                                            
-                                        } else {
-                                            core_.sleep(Math.min(0.5 * regionSettings.getVideoExposureTime(), 20));
-                                        }
+                                    try {
+                                        core_.startSequenceAcquisition(numImages, 0, true);
+                                        while (core_.getRemainingImageCount() > 0 || core_.isSequenceRunning()) {
+                                            if (core_.getRemainingImageCount() > 0) {
+                                                TaggedImage tagged = core_.popNextTaggedImage();
+                                                Image image = mm_.data().convertTaggedImage(tagged);
+                                                Metadata meta = image.getMetadata().copy().xPositionUm(xPos).yPositionUm(yPos).zPositionUm(zPos).build();
+                                                Coords coords = image.getCoords().copyBuilder().t(frameNumber).build();
+                                                image = image.copyWith(coords, meta);
+                                                data.putImage(image);
+                                                frameNumber++;
+                                                timeout = 0;
+                                                if (core_.isSequenceRunning() & !sequenceBoolean) {
+                                                    view.getAcquisitionLabel().setText("Saving " + channel + " video");
+                                                    sequenceBoolean = true;
+                                                } else {
+                                                    core_.sleep(10);
+                                                    timeout++;
+                                                }
+                                                
+                                                if (abortBoolean) {
+                                                    core_.stopSequenceAcquisition();
+                                                    view.getAcquisitionLabel().setText("Aborted");
+                                                    view.getStartAcquisitionButton().setEnabled(true);
+                                                    break acquisition;
+                                                }
                                         
+                                                if (timeout > 1000) {
+                                                    core_.stopSequenceAcquisition();
+                                                    core_.clearCircularBuffer();
+                                                    view.getAcquisitionLabel().setText("Timepoint " + (numTimePoints + 1) + " " + channel + " video failed, camera timeout");
+                                                    mm_.logs().logMessage("Timepoint " + (numTimePoints + 1) + " " + channel + " video failed, camera timeout");
+                                                }
+                                            }      
+                                        }
+                                        core_.stopSequenceAcquisition();
+                                        data.close();
+                                        core_.clearCircularBuffer();
+                                    
                                         if (abortBoolean) {
-                                            core_.stopSequenceAcquisition();
                                             view.getAcquisitionLabel().setText("Aborted");
                                             view.getStartAcquisitionButton().setEnabled(true);
                                             break acquisition;
                                         }
-                                    }
-                                    data.close();
-                                    core_.clearCircularBuffer();
-                                    
-                                    if (abortBoolean) {
-                                        view.getAcquisitionLabel().setText("Aborted");
-                                        view.getStartAcquisitionButton().setEnabled(true);
-                                        break acquisition;
+                                    } catch (Exception e) {
+                                        mm_.logs().logMessage("Timepoint " + (numTimePoints + 1) + " " + channel + " video failed, unknown error");
+                                        view.getAcquisitionLabel().setText("Timepoint " + (numTimePoints + 1) + " " + channel + " video failed, unknown error, check logs");
                                     }
                                 }
                             }
@@ -205,6 +224,7 @@ public class Acquisition implements Runnable{
                                     data = mm_.data().createSinglePlaneTIFFSeriesDatastore(dir);
                                     int numFrames = Math.round(Math.abs(zEnd - zStart) / stepSize);
                                     boolean sequenceBoolean = false;
+                                    int timeout = 0;
                                     core_.setConfig(settings.getChannelGroupName(), channel);
                                     
                                     if (zStart <= zEnd) {
@@ -212,52 +232,72 @@ public class Acquisition implements Runnable{
                                     } else {
                                         hardwareCommands.scanSetup(zStart + 3, zEnd - 3);
                                     }
-                                    core_.startSequenceAcquisition(numFrames, 0, false);
-                                    hardwareCommands.scanStart();
                                     
-                                    while (core_.getRemainingImageCount() > 0 || core_.isSequenceRunning()) {
-                                        for (int curFrame = 0; curFrame < numFrames;) {
-                                            if (core_.getRemainingImageCount() > 0) {
-                                                TaggedImage tagged = core_.popNextTaggedImage();
-                                                Image image = mm_.data().convertTaggedImage(tagged);
+                                    try{
+                                        core_.startSequenceAcquisition(numFrames, 0, false);
+                                        hardwareCommands.scanStart();
+                                    
+                                        while (core_.getRemainingImageCount() > 0 || core_.isSequenceRunning()) {
+                                            for (int curFrame = 0; curFrame < numFrames;) {
+                                                if (core_.getRemainingImageCount() > 0) {
+                                                    TaggedImage tagged = core_.popNextTaggedImage();
+                                                    Image image = mm_.data().convertTaggedImage(tagged);
                                                 
-                                                double zPosScan = 0;
-                                                if (zEnd >= zStart) {
-                                                    zPosScan = zStart + stepSize * curFrame;
-                                                } else {
-                                                    zPosScan = zStart - stepSize * curFrame;
-                                                }
-                                                Metadata meta = image.getMetadata().copyBuilderPreservingUUID().xPositionUm(xPos).yPositionUm(yPos).zPositionUm(zPosScan).build();
-                                                Coords coords = image.getCoords().copyBuilder().z(curFrame).build();
-                                                image = image.copyWith(coords, meta);
-                                                data.putImage(image);
-                                                curFrame++;
-                                                if (!core_.isSequenceRunning() & !sequenceBoolean) {
-                                                    view.getAcquisitionLabel().setText("Saving " + channel + " z stack");
-                                                    sequenceBoolean = true;
-                                                }
-                                            } else {
-                                                core_.sleep(10);
-                                            }
+                                                    double zPosScan = 0;
+                                                    if (zEnd >= zStart) {
+                                                        zPosScan = zStart + stepSize * curFrame;
+                                                    } else {
+                                                        zPosScan = zStart - stepSize * curFrame;
+                                                    }
+                                                    Metadata meta = image.getMetadata().copyBuilderPreservingUUID().xPositionUm(xPos).yPositionUm(yPos).zPositionUm(zPosScan).build();
+                                                    Coords coords = image.getCoords().copyBuilder().z(curFrame).build();
+                                                    image = image.copyWith(coords, meta);
+                                                    data.putImage(image);
+                                                    curFrame++;
+                                                    timeout = 0;
+                                                    if (!core_.isSequenceRunning() & !sequenceBoolean) {
+                                                        view.getAcquisitionLabel().setText("Saving " + channel + " z stack");
+                                                        sequenceBoolean = true;
+                                                    } else {
+                                                        core_.sleep(10);
+                                                    }
                                             
-                                            if(abortBoolean) {
+                                                    if(abortBoolean) {
+                                                        core_.stopSequenceAcquisition();
+                                                        view.getAcquisitionLabel().setText("Aborted");
+                                                        view.getStartAcquisitionButton().setEnabled(true);
+                                                        break acquisition;
+                                                    }
+                                                    
+                                                    if (timeout > 1000) {
+                                                        core_.stopSequenceAcquisition();
+                                                        core_.clearCircularBuffer();
+                                                        if (curFrame < numFrames) {
+                                                            view.getAcquisitionLabel().setText("Timepoint " + (numTimePoints + 1) + " " + channel + " z stack failed, not enough images acquired");
+                                                            mm_.logs().logMessage("Timepoint " + (numTimePoints + 1) + " " + channel + " z stack failed, not enough images acquired");
+                                                        } else {
+                                                            view.getAcquisitionLabel().setText("Timepoint " + (numTimePoints + 1) + " " + channel + " z stack failed, camera timeout");
+                                                            mm_.logs().logMessage("Timepoint " + (numTimePoints + 1) + " " + channel + " z stack failed, camera timeout");
+                                                        }
+                                                        break;
+                                                    }
+                                                }
                                                 core_.stopSequenceAcquisition();
-                                                view.getAcquisitionLabel().setText("Aborted");
-                                                view.getStartAcquisitionButton().setEnabled(true);
-                                                break acquisition;
                                             }
-                                        }
-                                        core_.stopSequenceAcquisition();
-                                    } 
-                                    data.close();
-                                    core_.clearCircularBuffer();
-                                    //Small pause added in between scans because stage was having weird backlash issues
-                                    core_.sleep(2000);
+                                        } 
+                                        data.close();
+                                        core_.clearCircularBuffer();
+                                        //Small pause added in between scans because stage was having weird backlash issues
+                                        core_.sleep(2000);
                                     
-                                    if (abortBoolean) {
-                                        view.getAcquisitionLabel().setText("Aborted");
-                                        view.getStartAcquisitionButton().setEnabled(true);
-                                        break acquisition;
+                                        if (abortBoolean) {
+                                            view.getAcquisitionLabel().setText("Aborted");
+                                            view.getStartAcquisitionButton().setEnabled(true);
+                                            break acquisition;
+                                        }
+                                    } catch (Exception e) {
+                                        mm_.logs().logMessage("Timepoint " + (numTimePoints + 1) + " " + channel + " z stack failed, unknown error");
+                                        view.getAcquisitionLabel().setText("Timepoint " + (numTimePoints + 1) + " " + channel + " z stack failed, unknown error, check logs");
                                     }
                                 }
                             }

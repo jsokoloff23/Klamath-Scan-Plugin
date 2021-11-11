@@ -161,7 +161,7 @@ public class HardwareCommands {
     //for circuit details.
     public void initializePLC(int stepSize) throws Exception {
         
-        int triggerPulseWidth = 20;
+        int triggerPulseWidth = scanExposure;
         int frameInterval = (int) Math.round((stepSize / zScanSpeed) * 4);
         
         setProperty(plcName, propPosition, addrDelay1);
@@ -203,7 +203,7 @@ public class HardwareCommands {
     
     public void setPLCProperties(int stepSize) throws Exception {
         
-        int triggerPulseWidth = 20;
+        int triggerPulseWidth = scanExposure;
         int frameInterval = (int) Math.round((stepSize / zScanSpeed) * 4);
                 
         setProperty(plcName, propPosition, addrDelay2);
