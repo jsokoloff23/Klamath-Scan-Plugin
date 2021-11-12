@@ -112,13 +112,13 @@ public class Acquisition implements Runnable{
                             
                             for (String channel : channelOrderArray) {
                                 if (regionSettings.getSnapChannelArray().contains(channel)) {
-                                    view.getAcquisitionLabel().setText("Acquiring " + channel + " snap");
-                                    core_.setConfig(settings.getChannelGroupName(), channel);
-                                    
+                                    view.getAcquisitionLabel().setText("Initializing " + channel + " snap");
                                     String dir = directory + "/Fish" + (fishNum + 1) + "/Timepoint" + (numTimePoints + 1) + "/Pos" + (regionNum + 1) + "/snap/" + channel;
                                     dir = fileExistsCheck(dir);
                                     data = mm_.data().createSinglePlaneTIFFSeriesDatastore(dir);
                                     
+                                    view.getAcquisitionLabel().setText("Acquiring " + channel + " snap");
+                                    core_.setConfig(settings.getChannelGroupName(), channel);
                                     Image image = mm_.live().snap(false).get(0);
                                     Metadata meta = image.getMetadata().copy().xPositionUm(xPos).yPositionUm(yPos).zPositionUm(zPos).build();
                                     Coords coords = image.getCoords().copyBuilder().build();
@@ -143,9 +143,7 @@ public class Acquisition implements Runnable{
                             
                             for (String channel : channelOrderArray) {
                                 if (regionSettings.getVideoChannelArray().contains(channel)) {
-                                    view.getAcquisitionLabel().setText("Acquiring " + channel + " video");
-                                    
-                                    core_.setConfig(settings.getChannelGroupName(), channel);
+                                    view.getAcquisitionLabel().setText("Initializing " + channel + " video");
                                     String dir = directory + "/Fish" + (fishNum + 1) + "/Timepoint" + (numTimePoints + 1) + "/Pos" + (regionNum + 1) + "/video/" + channel;
                                     dir = fileExistsCheck(dir);
                                     data = mm_.data().createSinglePlaneTIFFSeriesDatastore(dir);
@@ -154,7 +152,10 @@ public class Acquisition implements Runnable{
                                     int frameNumber = 0;
                                     int timeout = 0;
                                     boolean sequenceBoolean = false;
+                                    
+                                    view.getAcquisitionLabel().setText("Acquiring " + channel + " video");
                                     try {
+                                        core_.setConfig(settings.getChannelGroupName(), channel);
                                         core_.startSequenceAcquisition(numImages, 0, true);
                                         while (core_.getRemainingImageCount() > 0 || core_.isSequenceRunning()) {
                                             if (core_.getRemainingImageCount() > 0) {
@@ -217,23 +218,23 @@ public class Acquisition implements Runnable{
                           
                             for (String channel : settings.getChannelOrderArray()) {
                                 if (regionSettings.getZStackChannelArray().contains(channel)) {
-                                    view.getAcquisitionLabel().setText("Acquiring " + channel + " z stack");
-                                    
+                                    view.getAcquisitionLabel().setText("Initializing " + channel + " z stack");
                                     String dir = directory + "/Fish" + (fishNum + 1) + "/Timepoint" + (numTimePoints + 1) + "/Pos" + (regionNum + 1) + "/zStack/" + channel;
                                     dir = fileExistsCheck(dir);
                                     data = mm_.data().createSinglePlaneTIFFSeriesDatastore(dir);
+                                    
                                     int numFrames = Math.round(Math.abs(zEnd - zStart) / stepSize);
                                     boolean sequenceBoolean = false;
                                     int timeout = 0;
-                                    core_.setConfig(settings.getChannelGroupName(), channel);
                                     
                                     if (zStart <= zEnd) {
                                         hardwareCommands.scanSetup(zStart - 3, zEnd + 3);
                                     } else {
                                         hardwareCommands.scanSetup(zStart + 3, zEnd - 3);
                                     }
-                                    
+                                    view.getAcquisitionLabel().setText("Acquiring " + channel + " z stack");
                                     try{
+                                        core_.setConfig(settings.getChannelGroupName(), channel);
                                         core_.startSequenceAcquisition(numFrames, 0, false);
                                         hardwareCommands.scanStart();
                                     
@@ -312,11 +313,12 @@ public class Acquisition implements Runnable{
                         view.getStartAcquisitionButton().setEnabled(true);
                         break acquisition;
                     }
-                    
-                    long end = System.nanoTime();
-                    long durationMS = (int) Math.round((end - start) / Math.pow(10, 6)) ;
-                    double delay = settings.getTimePointsInterval() * 60 * 1000;
+                   
                     if (settings.getTimePointsBoolean() & (settings.getNumTimePoints() - numTimePoints) > 1) {
+                        long end = System.nanoTime();
+                        long durationMS = (int) Math.round((end - start) / Math.pow(10, 6)) ;
+                        double delay = settings.getTimePointsInterval() * 60 * 1000;
+                        
                         while (delay - durationMS > 0) {
                             end = System.nanoTime();
                             durationMS = (int) Math.round((end - start) / Math.pow(10, 6)) ;

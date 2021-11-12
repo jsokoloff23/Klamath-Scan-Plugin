@@ -608,8 +608,6 @@ public class Controller {
             if (regionSettings.getFishNumber() > fishNum) {
                 totalRegionNum--;
                 regionSettings = acquisitionSettings.getRegionSettings(totalRegionNum);
-                fishNum = regionSettings.getFishNumber();
-                fishRegionNum = regionSettings.getRegionNumber();
             }
             fishNum = regionSettings.getFishNumber();
             fishRegionNum = regionSettings.getRegionNumber();
@@ -829,7 +827,7 @@ public class Controller {
 
         regionSettings = new RegionSettings();
 
-        if (acquisitionSettings.getRegionSettingsArray().size() >= totalRegionNum + 1) {
+        if (acquisitionSettings.getRegionSettingsArray().size() > totalRegionNum) {
             if (acquisitionSettings.getRegionSettings(totalRegionNum).getFishNumber() == fishNum) {
                 regionSettings = acquisitionSettings.getRegionSettings(totalRegionNum);
 
@@ -844,7 +842,7 @@ public class Controller {
             }
         }
 
-        if (acquisitionSettings.getRegionSettingsArray().size() < totalRegionNum + 1) {
+        if (acquisitionSettings.getRegionSettingsArray().size() <= totalRegionNum) {
             view.getNextRegionButton().setEnabled(false);
             view.getRemoveRegionButton().setEnabled(false);
         }
@@ -855,7 +853,6 @@ public class Controller {
         regionSettings.setRegionNumber(fishRegionNum);
 
         regionSettingsGUIChange();
-
     }                                                
 
     private void acquisitionSetupButtonActionPerformed(java.awt.event.ActionEvent evt) {                                                       
